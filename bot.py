@@ -51,8 +51,11 @@ def build_online_message(is_online: bool, info, players):
     ]
     return "\n".join(lines)
 
-
-@bot.message_handler(commands=["ONLINE"])
+@bot.message_handler(commands=["start"])
+def handle_start(message: telebot.types.Message):
+    bot.reply_to(message, "Бот запущен, пиши /ONLINE")
+    
+@bot.message_handler(commands=["online", "ONLINE"])
 def handle_online(message: telebot.types.Message):
     bot.reply_to(message, ".")
     is_online, info, players = query_server_info()
