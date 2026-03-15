@@ -1,8 +1,15 @@
 import os
+import logging
+
 import a2s
 import telebot
 from flask import Flask, request
 
+# Логи будем видеть в Render → Logs
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Токен бота берём из переменной окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 CS_SERVER_ADDRESS = ("91.211.118.88", 27055)
@@ -20,7 +27,8 @@ def query_server_info():
         info = a2s.info(CS_SERVER_ADDRESS, timeout=2.5)
         players = a2s.players(CS_SERVER_ADDRESS, timeout=2.5)
         return True, info, players
-    except Exception:
+    except Exception as e:
+        logger.exception("Error while querying CS server: %s", e)
         return False, None, None
 
 
@@ -51,21 +59,41 @@ def build_online_message(is_online: bool, info, players):
     ]
     return "\n".join(lines)
 
+
+# ===== ОБРАБОТЧИКИ =====
+
 @bot.message_handler(commands=["start"])
 def handle_start(message: telebot.types.Message):
+    logger.info("Got /start from chat %s", message.chat.id)
     bot.reply_to(message, "Бот запущен, пиши /ONLINE")
-    
+
+
 @bot.message_handler(commands=["online", "ONLINE"])
 def handle_online(message: telebot.types.Message):
+    logger.info("Got /ONLINE from chat %s", message.chat.id)
     bot.reply_to(message, ".")
     is_online, info, players = query_server_info()
     msg = build_online_message(is_online, info, players)
     bot.send_message(message.chat.id, msg, disable_web_page_preview=True)
 
 
+@bot.message_handler(func=lambda m: True)
+def handle_any(message: telebot.types.Message):
+    # Для отладки: логируем любое входящее сообщение
+    logger.info(
+        "Got message: chat_id=%s, text=%r, from=%s",
+        message.chat.id,
+        message.text,
+        message.from_user.username if message.from_user else None,
+    )
+
+
+# ===== FLASK WEBHOOK =====
+
 @app.route("/webhook", methods=["POST"])
 def webhook():
     json_str = request.get_data().decode("utf-8")
+    logger.info("Incoming webhook: %s", json_str)
     update = telebot.types.Update.de_json(json_str)
     bot.process_new_updates([update])
     return "OK", 200
@@ -74,7 +102,3 @@ def webhook():
 @app.route("/", methods=["GET"])
 def index():
     return "Bot is running", 200
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
