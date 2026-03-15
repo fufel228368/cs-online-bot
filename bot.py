@@ -70,6 +70,19 @@ def build_online_message(is_online: bool, info, players):
     player_count = getattr(info, "player_count", 0)
     max_players = getattr(info, "max_players", 0)
 
+    players_list = []
+
+    if players:
+        for player in players:
+            name = player.name if player.name else "Без ника"
+            name = html.escape(name)
+            players_list.append(f"• {name}")
+
+        players_text = "\n".join(players_list)
+
+    else:
+        players_text = "Нет игроков"
+        
     lines = [
         "<b>Состояние сервера — 🟢 Онлайн</b>",
         f"<b>Сервер:</b> {server_name}",
@@ -98,7 +111,20 @@ def handle_online(message: telebot.types.Message):
     msg = build_online_message(is_online, info, players)
     bot.send_message(message.chat.id, msg, disable_web_page_preview=True)
 
+@bot.message_handler(content_types=["new_chat_members"])
+def welcome_user(message: telebot.types.Message):
 
+    for user in message.new_chat_members:
+
+        name = user.first_name
+        if user.last_name:
+            name += " " + user.last_name
+
+        welcome_text = (
+            f"💙💛Welcome HARKIV Front, <b>{name}</b>!\n\n 💙💛 "
+            f"Всі питання в розділах нашої групи ❤️💙💛"
+        )
+        
 @bot.message_handler(func=lambda m: True)
 def handle_any(message: telebot.types.Message):
     # Для отладки: логируем любое входящее сообщение
