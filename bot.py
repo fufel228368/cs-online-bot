@@ -18,7 +18,6 @@ else:
     logger.info("BOT_TOKEN loaded (first chars): %s***", BOT_TOKEN[:6])
 
 CS_SERVER_ADDRESS = ("91.211.118.88", 27055)
-SERVER_SITE = "gamecs-ua.com"
 SERVER_NAME_FALLBACK = "Харьковский  Фронт  18+ (+VIP)"
 SHIFT_INFO = "Неизвестно"
 FRAGS = 0
@@ -62,7 +61,6 @@ def build_online_message(is_online: bool, info, players):
             "<b>Состояние сервера — 🔴 Офлайн</b>\n"
             f"<b>Сервер:</b> {SERVER_NAME_FALLBACK}\n"
             f"<b>IP:</b> {ip}:{port}\n"
-            f"<b>Site:</b> {SERVER_SITE}\n"
         )
 
     server_name = getattr(info, "server_name", None) or SERVER_NAME_FALLBACK
@@ -85,8 +83,6 @@ def build_online_message(is_online: bool, info, players):
             lines.append(f"• {player.name}")
     else:
         lines.append("Нет игроков")
-
-    lines.append(f"\n<b>Site:</b> {SERVER_SITE}")
 
     return "\n".join(lines)
 
