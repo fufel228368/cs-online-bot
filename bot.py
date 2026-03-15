@@ -104,6 +104,26 @@ def webhook():
     bot.process_new_updates([update])
     return "OK", 200
 
+RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
+
+if __name__ == "__main__":
+    # 1. Обов'язково видаляємо старий вебхук/поллінг перед встановленням нового
+    bot.remove_webhook()
+    
+    if RENDER_EXTERNAL_URL:
+        webhook_url = f"{RENDER_EXTERNAL_URL}/webhook"
+        # 2. Встановлюємо вебхук
+        bot.set_webhook(url=webhook_url)
+        logger.info(f"Webhook set to: {webhook_url}")
+    else:
+        logger.warning("RENDER_EXTERNAL_URL not found! Starting polling (not recommended for Web Service)...")
+        # Якщо URL немає, запускаємо звичайний поллінг як запасний варіант
+        bot.infinity_polling(threaded=False)
+
+    # 3. Запускаємо сервер Flask
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
 
 @app.route("/", methods=["GET"])
 def index():
