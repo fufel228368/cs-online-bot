@@ -115,6 +115,11 @@ def welcome_user(message: telebot.types.Message):
             f"💙💛Welcome HARKIV Front, <b>{name}</b>!\n\n 💙💛 "
             f"Всі питання в розділах нашої групи ❤️💙💛"
         )
+
+        bot.send_message(
+            message.chat.id,
+            welcome_text
+        )
         
 @bot.message_handler(func=lambda m: True)
 def handle_any(message: telebot.types.Message):
