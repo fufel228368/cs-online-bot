@@ -23,7 +23,8 @@ SERVER_NAME_FALLBACK = "Харьковский  Фронт  18+ (+VIP)"
 SHIFT_INFO = "Неизвестно"
 FRAGS = 0
 
-bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=False)
+
 app = Flask(__name__)
 
 
