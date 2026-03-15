@@ -12,6 +12,11 @@ logger = logging.getLogger(__name__)
 # Токен бота берём из переменной окружения
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
+if not BOT_TOKEN:
+    logger.error("BOT_TOKEN is not set in environment!")
+else:
+    logger.info("BOT_TOKEN loaded (first chars): %s***", BOT_TOKEN[:6])
+
 CS_SERVER_ADDRESS = ("91.211.118.88", 27055)
 SERVER_SITE = "gamecs-ua.com"
 SERVER_NAME_FALLBACK = "Харьковский  Фронт  18+ (+VIP)"
