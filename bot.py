@@ -27,6 +27,22 @@ bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=False)
 
 app = Flask(__name__)
 
+# Ця функція спрацює один раз ПЕРЕД тим, як сервер почне приймати запити
+@app.before_request
+def setup_webhook():
+    # Робимо це лише один раз
+    app.before_request_funcs[None].remove(setup_webhook)
+    
+    RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
+    if RENDER_EXTERNAL_URL:
+        webhook_url = f"{RENDER_EXTERNAL_URL}/webhook"
+        bot.remove_webhook()
+        bot.set_webhook(url=webhook_url)
+        logger.info(f"Webhook set to: {webhook_url}")
+    else:
+        logger.error("RENDER_EXTERNAL_URL is not set!")
+
+
 
 def query_server_info():
     try:
