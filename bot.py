@@ -70,30 +70,25 @@ def build_online_message(is_online: bool, info, players):
     player_count = getattr(info, "player_count", 0)
     max_players = getattr(info, "max_players", 0)
 
-    players_list = []
-
-    if players:
-        for player in players:
-            name = player.name if player.name else "Без ника"
-            name = html.escape(name)
-            players_list.append(f"• {name}")
-
-        players_text = "\n".join(players_list)
-
-    else:
-        players_text = "Нет игроков"
-        
     lines = [
         "<b>Состояние сервера — 🟢 Онлайн</b>",
         f"<b>Сервер:</b> {server_name}",
         f"<b>IP:</b> {ip}:{port}",
         f"<b>Карта:</b> {current_map}",
-        f"<b>До смены:</b> {SHIFT_INFO}",
         f"<b>Онлайн:</b> {player_count}/{max_players}",
-        f"<b>Site:</b> {SERVER_SITE} — {FRAGS} фр.",
+        "",
+        "<b>Игроки:</b>"
     ]
-    return "\n".join(lines)
 
+    if players:
+        for player in players:
+            lines.append(f"• {player.name}")
+    else:
+        lines.append("Нет игроков")
+
+    lines.append(f"\n<b>Site:</b> {SERVER_SITE}")
+
+    return "\n".join(lines)
 
 # ===== ОБРАБОТЧИКИ =====
 
