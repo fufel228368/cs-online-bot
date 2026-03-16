@@ -61,6 +61,15 @@ def get_nick_link(nick: str):
     return load_nick_links().get(nick.strip().lower())
 
 
+def get_nick_by_user_id(user_id: int):
+    """По Telegram user_id возвращает привязанный ник (первый найденный) или None."""
+    links = load_nick_links()
+    for nick_key, data in links.items():
+        if data["user_id"] == user_id:
+            return nick_key
+    return None
+
+
 def remove_nick_link(nick: str):
     nick_key = nick.strip().lower()
     links = load_nick_links()
@@ -74,6 +83,110 @@ def remove_nick_link(nick: str):
 def html_escape(s: str) -> str:
     """Экранирует HTML, чтобы ник с < или & не ломал разметку."""
     return html.escape(s) if s else ""
+
+
+# ===== СТАТИСТИКА ИГРОКОВ (заглушки — подставь свой API) =====
+# Переменная STATS_API_URL — базовый URL API твоего сервера (если есть).
+# Пока не задана — бот отвечает "статистика не подключена".
+
+STATS_API_URL = os.getenv("STATS_API_URL", "").rstrip("/")
+
+
+def get_player_stats(nick: str):
+    """
+    Возвращает словарь с полями: kills, deaths, time, bonuses, place и т.д.
+    или None, если статистика недоступна.
+    Подставь сюда запрос к своему API по нику.
+    """
+    if not STATS_API_URL or not nick:
+        return None
+    try:
+        import urllib.request
+        url = f"{STATS_API_URL}/player?nick={urllib.request.quote(nick.strip())}"
+        with urllib.request.urlopen(url, timeout=5) as r:
+            if r.status == 200:
+                return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        logger.debug("get_player_stats %s: %s", nick, e)
+    return None
+
+
+def get_top_anew(limit: int = 10):
+    """Топ по бонусам. Возвращает список [{"nick": str, "value": int}, ...] или []."""
+    if not STATS_API_URL:
+        return []
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{STATS_API_URL}/top/anew?limit={limit}", timeout=5) as r:
+            if r.status == 200:
+                return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        logger.debug("get_top_anew: %s", e)
+    return []
+
+
+def get_top_kill(limit: int = 10):
+    """Топ по убийствам."""
+    if not STATS_API_URL:
+        return []
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{STATS_API_URL}/top/kill?limit={limit}", timeout=5) as r:
+            if r.status == 200:
+                return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        logger.debug("get_top_kill: %s", e)
+    return []
+
+
+def get_top_time(limit: int = 10):
+    """Топ по времени."""
+    if not STATS_API_URL:
+        return []
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{STATS_API_URL}/top/time?limit={limit}", timeout=5) as r:
+            if r.status == 200:
+                return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        logger.debug("get_top_time: %s", e)
+    return []
+
+
+def get_top10(limit: int = 10):
+    """Общий топ игроков."""
+    if not STATS_API_URL:
+        return []
+    try:
+        import urllib.request
+        with urllib.request.urlopen(f"{STATS_API_URL}/top?limit={limit}", timeout=5) as r:
+            if r.status == 200:
+                return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        logger.debug("get_top10: %s", e)
+    return []
+
+
+def format_player_stats(nick: str, stats: dict) -> str:
+    """Форматирует ответ по статистике игрока."""
+    parts = [f"<b>📊 {html_escape(nick)}</b>"]
+    for key, val in (stats or {}).items():
+        if key in ("nick", "name"):
+            continue
+        parts.append(f"  {key}: {val}")
+    return "\n".join(parts) if len(parts) > 1 else f"<b>📊 {html_escape(nick)}</b>\nНет данных."
+
+
+def format_top(title: str, rows: list, value_key: str = "value") -> str:
+    """Форматирует топ-список."""
+    if not rows:
+        return f"<b>{title}</b>\nНет данных (или API не подключён: задай STATS_API_URL)."
+    lines = [f"<b>{title}</b>"]
+    for i, row in enumerate(rows[:15], 1):
+        nick = row.get("nick", row.get("name", "—"))
+        val = row.get(value_key, row.get("score", "—"))
+        lines.append(f"{i}. {html_escape(str(nick))} — {val}")
+    return "\n".join(lines)
 
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=False)
@@ -151,9 +264,17 @@ def handle_start(message: telebot.types.Message):
     logger.info("Got /start from chat %s", message.chat.id)
     bot.reply_to(
         message,
-        "Бот запущен.\n"
-        "• /ONLINE — статистика сервера (игроки кликабельны, если привязали ник через /link)\n"
-        "• /link Ник — привязать свой ник в игре к профилю в TG",
+        "Бот запущен.\n\n"
+        "• /ONLINE — кто на сервере (ники кликабельны)\n"
+        "• /link Ник — привязать ник к профилю в TG\n\n"
+        "<b>Статистика игроков:</b>\n"
+        "• /me — твоя статистика\n"
+        "• /yu — статистика игрока (ответь на его сообщение)\n"
+        "• /play_Ник — информация по нику\n"
+        "• /top_anew — топ по бонусам\n"
+        "• /top_kill — топ по убийствам\n"
+        "• /top_time — топ по времени\n"
+        "• /top10 — общий топ",
     )
 
 
@@ -200,6 +321,95 @@ def handle_unlink(message: telebot.types.Message):
         bot.reply_to(message, f"✅ Ник <b>{html_escape(nick)}</b> отвязан.")
     else:
         bot.reply_to(message, f"Ник <b>{html_escape(nick)}</b> не был привязан.")
+
+
+# ===== СТАТИСТИКА ИГРОКОВ =====
+
+@bot.message_handler(commands=["me"])
+def handle_me(message: telebot.types.Message):
+    """Ваша статистика — по привязанному нику."""
+    user_id = message.from_user.id if message.from_user else None
+    if not user_id:
+        bot.reply_to(message, "Не удалось определить пользователя.")
+        return
+    nick = get_nick_by_user_id(user_id)
+    if not nick:
+        bot.reply_to(
+            message,
+            "Сначала привяжи свой ник с сервера: <code>/link ТвойНик</code>\n"
+            "После этого здесь будет отображаться твоя статистика.",
+        )
+        return
+    stats = get_player_stats(nick)
+    if stats is None:
+        bot.reply_to(message, f"Ты привязан как <b>{html_escape(nick)}</b>. Статистика с сервера пока не подключена (настрой STATS_API_URL).")
+        return
+    bot.reply_to(message, format_player_stats(nick, stats))
+
+
+@bot.message_handler(commands=["yu"])
+def handle_yu(message: telebot.types.Message):
+    """Статистика другого игрока (в ответ на его сообщение)."""
+    if not message.reply_to_message or not message.reply_to_message.from_user:
+        bot.reply_to(message, "Ответь на сообщение игрока, чтобы посмотреть его статистику.")
+        return
+    user_id = message.reply_to_message.from_user.id
+    nick = get_nick_by_user_id(user_id)
+    if not nick:
+        bot.reply_to(message, "У этого пользователя нет привязанного ника. Пусть напишет /link СвойНик.")
+        return
+    stats = get_player_stats(nick)
+    if stats is None:
+        bot.reply_to(message, f"Ник: <b>{html_escape(nick)}</b>. Статистика с сервера пока не подключена.")
+        return
+    bot.reply_to(message, format_player_stats(nick, stats))
+
+
+@bot.message_handler(func=lambda m: m.text and m.text.strip().startswith("/play_"))
+def handle_play_nick(message: telebot.types.Message):
+    """Информация по нику: /play_Ник (без пробела)."""
+    text = (message.text or "").strip()
+    # /play_Nick или /play_Ник
+    if len(text) <= 6:
+        bot.reply_to(message, "Пример: <code>/play_ИмяИгрока</code>")
+        return
+    nick = text[6:].strip()  # после "/play_"
+    if not nick:
+        bot.reply_to(message, "Укажи ник: <code>/play_ИмяИгрока</code>")
+        return
+    stats = get_player_stats(nick)
+    if stats is None:
+        bot.reply_to(message, f"По нику <b>{html_escape(nick)}</b> нет данных. Статистика может быть не подключена (STATS_API_URL).")
+        return
+    bot.reply_to(message, format_player_stats(nick, stats))
+
+
+@bot.message_handler(commands=["top_anew"])
+def handle_top_anew(message: telebot.types.Message):
+    """Топ по бонусам."""
+    rows = get_top_anew(10)
+    bot.reply_to(message, format_top("🏆 Топ по бонусам", rows))
+
+
+@bot.message_handler(commands=["top_kill"])
+def handle_top_kill(message: telebot.types.Message):
+    """Топ по убийствам."""
+    rows = get_top_kill(10)
+    bot.reply_to(message, format_top("🔫 Топ по убийствам", rows))
+
+
+@bot.message_handler(commands=["top_time"])
+def handle_top_time(message: telebot.types.Message):
+    """Топ по времени."""
+    rows = get_top_time(10)
+    bot.reply_to(message, format_top("⏱ Топ по времени", rows))
+
+
+@bot.message_handler(commands=["top10"])
+def handle_top10(message: telebot.types.Message):
+    """Общий топ игроков."""
+    rows = get_top10(10)
+    bot.reply_to(message, format_top("🏅 Общий топ игроков", rows))
 
 
 @bot.message_handler(content_types=["new_chat_members"])
