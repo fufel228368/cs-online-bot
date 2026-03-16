@@ -325,24 +325,27 @@ def handle_unlink(message: telebot.types.Message):
 
 # ===== СТАТИСТИКА ИГРОКОВ =====
 
+def reply_stats_unavailable(message: telebot.types.Message):
+    bot.reply_to(message, "пока что данные недоступны")
+
+
 @bot.message_handler(commands=["me"])
 def handle_me(message: telebot.types.Message):
     """Ваша статистика — по привязанному нику."""
+    if not STATS_API_URL:
+        reply_stats_unavailable(message)
+        return
     user_id = message.from_user.id if message.from_user else None
     if not user_id:
-        bot.reply_to(message, "Не удалось определить пользователя.")
+        reply_stats_unavailable(message)
         return
     nick = get_nick_by_user_id(user_id)
     if not nick:
-        bot.reply_to(
-            message,
-            "Сначала привяжи свой ник с сервера: <code>/link ТвойНик</code>\n"
-            "После этого здесь будет отображаться твоя статистика.",
-        )
+        reply_stats_unavailable(message)
         return
     stats = get_player_stats(nick)
     if stats is None:
-        bot.reply_to(message, f"Ты привязан как <b>{html_escape(nick)}</b>. Статистика с сервера пока не подключена (настрой STATS_API_URL).")
+        reply_stats_unavailable(message)
         return
     bot.reply_to(message, format_player_stats(nick, stats))
 
@@ -350,17 +353,20 @@ def handle_me(message: telebot.types.Message):
 @bot.message_handler(commands=["yu"])
 def handle_yu(message: telebot.types.Message):
     """Статистика другого игрока (в ответ на его сообщение)."""
+    if not STATS_API_URL:
+        reply_stats_unavailable(message)
+        return
     if not message.reply_to_message or not message.reply_to_message.from_user:
-        bot.reply_to(message, "Ответь на сообщение игрока, чтобы посмотреть его статистику.")
+        reply_stats_unavailable(message)
         return
     user_id = message.reply_to_message.from_user.id
     nick = get_nick_by_user_id(user_id)
     if not nick:
-        bot.reply_to(message, "У этого пользователя нет привязанного ника. Пусть напишет /link СвойНик.")
+        reply_stats_unavailable(message)
         return
     stats = get_player_stats(nick)
     if stats is None:
-        bot.reply_to(message, f"Ник: <b>{html_escape(nick)}</b>. Статистика с сервера пока не подключена.")
+        reply_stats_unavailable(message)
         return
     bot.reply_to(message, format_player_stats(nick, stats))
 
@@ -368,18 +374,21 @@ def handle_yu(message: telebot.types.Message):
 @bot.message_handler(func=lambda m: m.text and m.text.strip().startswith("/play_"))
 def handle_play_nick(message: telebot.types.Message):
     """Информация по нику: /play_Ник (без пробела)."""
+    if not STATS_API_URL:
+        reply_stats_unavailable(message)
+        return
     text = (message.text or "").strip()
     # /play_Nick или /play_Ник
     if len(text) <= 6:
-        bot.reply_to(message, "Пример: <code>/play_ИмяИгрока</code>")
+        reply_stats_unavailable(message)
         return
     nick = text[6:].strip()  # после "/play_"
     if not nick:
-        bot.reply_to(message, "Укажи ник: <code>/play_ИмяИгрока</code>")
+        reply_stats_unavailable(message)
         return
     stats = get_player_stats(nick)
     if stats is None:
-        bot.reply_to(message, f"По нику <b>{html_escape(nick)}</b> нет данных. Статистика может быть не подключена (STATS_API_URL).")
+        reply_stats_unavailable(message)
         return
     bot.reply_to(message, format_player_stats(nick, stats))
 
@@ -387,6 +396,9 @@ def handle_play_nick(message: telebot.types.Message):
 @bot.message_handler(commands=["top_anew"])
 def handle_top_anew(message: telebot.types.Message):
     """Топ по бонусам."""
+    if not STATS_API_URL:
+        reply_stats_unavailable(message)
+        return
     rows = get_top_anew(10)
     bot.reply_to(message, format_top("🏆 Топ по бонусам", rows))
 
@@ -394,6 +406,9 @@ def handle_top_anew(message: telebot.types.Message):
 @bot.message_handler(commands=["top_kill"])
 def handle_top_kill(message: telebot.types.Message):
     """Топ по убийствам."""
+    if not STATS_API_URL:
+        reply_stats_unavailable(message)
+        return
     rows = get_top_kill(10)
     bot.reply_to(message, format_top("🔫 Топ по убийствам", rows))
 
@@ -401,6 +416,9 @@ def handle_top_kill(message: telebot.types.Message):
 @bot.message_handler(commands=["top_time"])
 def handle_top_time(message: telebot.types.Message):
     """Топ по времени."""
+    if not STATS_API_URL:
+        reply_stats_unavailable(message)
+        return
     rows = get_top_time(10)
     bot.reply_to(message, format_top("⏱ Топ по времени", rows))
 
@@ -408,6 +426,9 @@ def handle_top_time(message: telebot.types.Message):
 @bot.message_handler(commands=["top10"])
 def handle_top10(message: telebot.types.Message):
     """Общий топ игроков."""
+    if not STATS_API_URL:
+        reply_stats_unavailable(message)
+        return
     rows = get_top10(10)
     bot.reply_to(message, format_top("🏅 Общий топ игроков", rows))
 
