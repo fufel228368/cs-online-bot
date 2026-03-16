@@ -220,8 +220,8 @@ def build_online_message(is_online: bool, info, players):
     if not is_online:
         return (
             "<b>Состояние сервера — 🔴 Офлайн</b>\n"
-            f"<b>Сервер:</b> {SERVER_NAME_FALLBACK}\n"
-            f"<b>IP:</b> {ip}:{port}\n"
+            f"🌐 <b>Сервер:</b> {html_escape(SERVER_NAME_FALLBACK)}\n"
+            f"🧩 <b>IP:</b> {ip}:{port}\n"
         )
 
     server_name = getattr(info, "server_name", None) or SERVER_NAME_FALLBACK
@@ -230,29 +230,38 @@ def build_online_message(is_online: bool, info, players):
     max_players = getattr(info, "max_players", 0)
 
     lines = [
-        "<b>Состояние сервера — 🟢 Онлайн</b>",
-        f"<b>Сервер:</b> {server_name}",
-        f"<b>IP:</b> {ip}:{port}",
-        f"<b>Карта:</b> {current_map}",
-        f"<b>Онлайн:</b> {player_count}/{max_players}",
-        "",
-        "<b>Игроки:</b> (нажми на ник — откроется профиль в TG)",
+        f"📂 <b>Состояние сервера —</b> 🟢 <b>Онлайн</b>",
+        f"🌐 <b>Сервер:</b> {html_escape(server_name)}",
+        f"🧩 <b>IP:</b> {ip}:{port}",
+        f"🗺 <b>Карта:</b> {html_escape(current_map)}",
+        f"⌛ <b>До смены:</b> {html_escape(SHIFT_INFO)}",
+        f"👥 <b>Онлайн:</b> {player_count}/{max_players}",
     ]
 
-    nick_links = load_nick_links()
+    # Список игроков с фрагами (score). Топ-3 с медалями, остальные с иконкой.
     if players:
-        for player in players:
-            name = (player.name or "").strip() or "—"
+        players_sorted = sorted(players, key=lambda p: getattr(p, "score", 0), reverse=True)
+        for idx, p in enumerate(players_sorted, start=1):
+            name = (getattr(p, "name", "") or "").strip() or "—"
+            score = int(getattr(p, "score", 0) or 0)
+
             safe_name = html_escape(name)
             link = get_nick_link(name) if name else None
             if link:
                 user_id = link["user_id"]
-                # tg://user?id= открывает профиль в Telegram по клику
-                lines.append(f'• <a href="tg://user?id={user_id}">{safe_name}</a>')
-            else:
-                lines.append(f"• {safe_name}")
+                safe_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
+
+            icon = "👤"
+            if idx == 1:
+                icon = "🥇"
+            elif idx == 2:
+                icon = "🥈"
+            elif idx == 3:
+                icon = "🥉"
+
+            lines.append(f"{icon} {safe_name} — {score} фр.")
     else:
-        lines.append("Нет игроков")
+        lines.append("👤 Нет игроков")
 
     return "\n".join(lines)
 
