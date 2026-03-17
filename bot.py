@@ -192,6 +192,16 @@ def format_top(title: str, rows: list, value_key: str = "value") -> str:
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=False)
 app = Flask(__name__)
 
+# В группах/супергруппах reply иногда падает (400: message to be replied not found).
+# Поэтому делаем безопасный ответ: сначала reply, при ошибке — обычное сообщение в чат.
+def safe_reply(message: telebot.types.Message, text: str, **kwargs):
+    try:
+        return bot.reply_to(message, text, **kwargs)
+    except Exception as e:
+        logger.warning("reply_to failed (chat_id=%s, message_id=%s): %s", getattr(message.chat, "id", None), getattr(message, "message_id", None), e)
+        return bot.send_message(message.chat.id, text, **kwargs)
+
+
 # Выставляем webhook при старте приложения (для gunicorn)
 RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
 if RENDER_EXTERNAL_URL:
@@ -271,7 +281,7 @@ def build_online_message(is_online: bool, info, players):
 @bot.message_handler(commands=["start"])
 def handle_start(message: telebot.types.Message):
     logger.info("Got /start from chat %s", message.chat.id)
-    bot.reply_to(
+    safe_reply(
         message,
         "Бот запущен.\n\n"
         "• /ONLINE — кто на сервере (ники кликабельны)\n"
@@ -290,7 +300,8 @@ def handle_start(message: telebot.types.Message):
 @bot.message_handler(commands=["online", "ONLINE"])
 def handle_online(message: telebot.types.Message):
     logger.info("Got /ONLINE from chat %s", message.chat.id)
-    bot.reply_to(message, ".")
+    # В группе reply может падать, поэтому используем safe_reply
+    safe_reply(message, ".")
     is_online, info, players = query_server_info()
     msg = build_online_message(is_online, info, players)
     bot.send_message(message.chat.id, msg, disable_web_page_preview=True)
@@ -301,7 +312,7 @@ def handle_link(message: telebot.types.Message):
     """Привязать свой ник в игре к профилю в Telegram. Пример: /link МойНик"""
     text = (message.text or "").strip().split(maxsplit=1)
     if len(text) < 2:
-        bot.reply_to(
+        safe_reply(
             message,
             "Напиши ник, который используешь на сервере.\n"
             "Пример: <code>/link МойНик</code>\n"
@@ -310,12 +321,12 @@ def handle_link(message: telebot.types.Message):
         return
     nick = text[1].strip()
     if not nick:
-        bot.reply_to(message, "Укажи ник, например: /link МойНик")
+        safe_reply(message, "Укажи ник, например: /link МойНик")
         return
     user_id = message.from_user.id
     username = message.from_user.username if message.from_user else None
     add_nick_link(nick, user_id, username)
-    bot.reply_to(message, f"✅ Привязано: <b>{html_escape(nick)}</b> → твой профиль в TG. В /ONLINE ник будет кликабельным.")
+    safe_reply(message, f"✅ Привязано: <b>{html_escape(nick)}</b> → твой профиль в TG. В /ONLINE ник будет кликабельным.")
 
 
 @bot.message_handler(commands=["unlink", "unbind", "отвязать"])
@@ -323,19 +334,19 @@ def handle_unlink(message: telebot.types.Message):
     """Отвязать ник. Пример: /unlink МойНик"""
     text = (message.text or "").strip().split(maxsplit=1)
     if len(text) < 2:
-        bot.reply_to(message, "Пример: <code>/unlink МойНик</code>")
+        safe_reply(message, "Пример: <code>/unlink МойНик</code>")
         return
     nick = text[1].strip()
     if remove_nick_link(nick):
-        bot.reply_to(message, f"✅ Ник <b>{html_escape(nick)}</b> отвязан.")
+        safe_reply(message, f"✅ Ник <b>{html_escape(nick)}</b> отвязан.")
     else:
-        bot.reply_to(message, f"Ник <b>{html_escape(nick)}</b> не был привязан.")
+        safe_reply(message, f"Ник <b>{html_escape(nick)}</b> не был привязан.")
 
 
 # ===== СТАТИСТИКА ИГРОКОВ =====
 
 def reply_stats_unavailable(message: telebot.types.Message):
-    bot.reply_to(message, "пока что данные недоступны")
+    safe_reply(message, "пока что данные недоступны")
 
 
 @bot.message_handler(commands=["me"])
@@ -356,7 +367,7 @@ def handle_me(message: telebot.types.Message):
     if stats is None:
         reply_stats_unavailable(message)
         return
-    bot.reply_to(message, format_player_stats(nick, stats))
+    safe_reply(message, format_player_stats(nick, stats))
 
 
 @bot.message_handler(commands=["yu"])
@@ -377,7 +388,7 @@ def handle_yu(message: telebot.types.Message):
     if stats is None:
         reply_stats_unavailable(message)
         return
-    bot.reply_to(message, format_player_stats(nick, stats))
+    safe_reply(message, format_player_stats(nick, stats))
 
 
 @bot.message_handler(func=lambda m: m.text and m.text.strip().startswith("/play_"))
@@ -399,7 +410,7 @@ def handle_play_nick(message: telebot.types.Message):
     if stats is None:
         reply_stats_unavailable(message)
         return
-    bot.reply_to(message, format_player_stats(nick, stats))
+    safe_reply(message, format_player_stats(nick, stats))
 
 
 @bot.message_handler(commands=["top_anew"])
@@ -409,7 +420,7 @@ def handle_top_anew(message: telebot.types.Message):
         reply_stats_unavailable(message)
         return
     rows = get_top_anew(10)
-    bot.reply_to(message, format_top("🏆 Топ по бонусам", rows))
+    safe_reply(message, format_top("🏆 Топ по бонусам", rows))
 
 
 @bot.message_handler(commands=["top_kill"])
@@ -419,7 +430,7 @@ def handle_top_kill(message: telebot.types.Message):
         reply_stats_unavailable(message)
         return
     rows = get_top_kill(10)
-    bot.reply_to(message, format_top("🔫 Топ по убийствам", rows))
+    safe_reply(message, format_top("🔫 Топ по убийствам", rows))
 
 
 @bot.message_handler(commands=["top_time"])
@@ -429,7 +440,7 @@ def handle_top_time(message: telebot.types.Message):
         reply_stats_unavailable(message)
         return
     rows = get_top_time(10)
-    bot.reply_to(message, format_top("⏱ Топ по времени", rows))
+    safe_reply(message, format_top("⏱ Топ по времени", rows))
 
 
 @bot.message_handler(commands=["top10"])
@@ -439,7 +450,7 @@ def handle_top10(message: telebot.types.Message):
         reply_stats_unavailable(message)
         return
     rows = get_top10(10)
-    bot.reply_to(message, format_top("🏅 Общий топ игроков", rows))
+    safe_reply(message, format_top("🏅 Общий топ игроков", rows))
 
 
 @bot.message_handler(content_types=["new_chat_members"])
