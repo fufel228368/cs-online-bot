@@ -4,6 +4,9 @@ import logging
 import html
 import a2s
 import telebot
+import threading
+import time
+import urllib.request
 from flask import Flask, request
 
 logging.basicConfig(level=logging.INFO)
@@ -206,6 +209,46 @@ def format_top(title: str, rows: list, value_key: str = "value") -> str:
 
 bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=False)
 app = Flask(__name__)
+
+# Keep-alive: на Render Free инстанс “засыпает” из-за неактивности.
+# Чтобы он не отключался, каждые N минут пингуем свой же GET `/`.
+def start_keepalive():
+    def resolve_base_url() -> str:
+        # 1) пробуем переменную окружения
+        base = os.getenv("RENDER_EXTERNAL_URL")
+        if base:
+            return base.rstrip("/")
+        # 2) пробуем взять url из текущего webhook
+        try:
+            info = bot.get_webhook_info()
+            url = info.get("url")
+            if url and isinstance(url, str) and url.endswith("/webhook"):
+                return url[:-len("/webhook")].rstrip("/")
+        except Exception:
+            pass
+        return ""
+
+    base_url = resolve_base_url()
+    if not base_url:
+        logger.warning("Keepalive disabled: cannot determine base URL (RENDER_EXTERNAL_URL and webhook url not found).")
+        return
+
+    ping_url = f"{base_url}/"
+    logger.info("Keepalive enabled: pinging %s every 5 minutes", ping_url)
+
+    def loop():
+        while True:
+            try:
+                # простой GET к своему же сервису
+                with urllib.request.urlopen(ping_url, timeout=8) as r:
+                    r.read(32)
+            except Exception as e:
+                logger.debug("Keepalive ping failed: %s", e)
+            time.sleep(300)  # 5 минут
+
+    t = threading.Thread(target=loop, daemon=True)
+    t.start()
+
 
 # В группах/супергруппах reply иногда падает (400: message to be replied not found).
 # Поэтому делаем безопасный ответ: сначала reply, при ошибке — обычное сообщение в чат.
@@ -507,6 +550,10 @@ def webhook():
     update = telebot.types.Update.de_json(json_str)
     bot.process_new_updates([update])
     return "OK", 200
+
+
+# Запускаем keepalive, пока сервис жив.
+start_keepalive()
 
 
 if __name__ == "__main__":
