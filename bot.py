@@ -20,8 +20,23 @@ SERVER_NAME_FALLBACK = "Харьковский  Фронт  18+ (+VIP)"
 SHIFT_INFO = "Неизвестно"
 FRAGS = 0
 
-# Файл с привязками ник в игре → Telegram (ник храним в нижнем регистре)
+# Файл с привязками ник в игре → Telegram (ник храним в нормализованном виде)
 NICK_LINKS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "nick_links.json")
+
+
+def normalize_nick(nick: str) -> str:
+    """
+    Нормализует ник для сопоставления:
+    - обрезает пробелы по краям
+    - приводит к нижнему регистру
+    - убирает лишние символы, оставляя буквы/цифры и базовые знаки.
+    Это помогает, если в CS ник отличается регистром или содержит пробелы.
+    """
+    if not nick:
+        return ""
+    nick = nick.strip().lower()
+    allowed = "abcdefghijklmnopqrstuvwxyz0123456789абвгдеёжзийклмнопрстуфхцчшщъыьэюя._-"
+    return "".join(ch for ch in nick if ch in allowed)
 
 
 def load_nick_links():
@@ -47,7 +62,7 @@ def save_nick_links(data):
 
 
 def add_nick_link(nick: str, user_id: int, username: str or None):
-    nick_key = nick.strip().lower()
+    nick_key = normalize_nick(nick)
     if not nick_key:
         return False
     links = load_nick_links()
@@ -58,7 +73,7 @@ def add_nick_link(nick: str, user_id: int, username: str or None):
 
 def get_nick_link(nick: str):
     """Возвращает {"user_id": int, "username": ...} или None."""
-    return load_nick_links().get(nick.strip().lower())
+    return load_nick_links().get(normalize_nick(nick))
 
 
 def get_nick_by_user_id(user_id: int):
@@ -71,7 +86,7 @@ def get_nick_by_user_id(user_id: int):
 
 
 def remove_nick_link(nick: str):
-    nick_key = nick.strip().lower()
+    nick_key = normalize_nick(nick)
     links = load_nick_links()
     if nick_key in links:
         del links[nick_key]
@@ -249,6 +264,7 @@ def build_online_message(is_online: bool, info, players):
     ]
 
     # Список игроков с фрагами (score). Топ-3 с медалями, остальные с иконкой.
+    links = load_nick_links()
     if players:
         players_sorted = sorted(players, key=lambda p: getattr(p, "score", 0), reverse=True)
         for idx, p in enumerate(players_sorted, start=1):
@@ -256,7 +272,7 @@ def build_online_message(is_online: bool, info, players):
             score = int(getattr(p, "score", 0) or 0)
 
             safe_name = html_escape(name)
-            link = get_nick_link(name) if name else None
+            link = links.get(normalize_nick(name)) if name else None
             if link:
                 user_id = link["user_id"]
                 safe_name = f'<a href="tg://user?id={user_id}">{safe_name}</a>'
