@@ -19,7 +19,7 @@ else:
     logger.info("BOT_TOKEN loaded (first chars): %s***", BOT_TOKEN[:6])
 
 CS_SERVER_ADDRESS = ("91.211.118.88", 27055)
-SERVER_NAME_FALLBACK = "Харьковский  Фронт  18+ (+VIP)"
+SERVER_NAME_FALLBACK = "KHARKIV_STYLE 18+"
 SHIFT_INFO = "Неизвестно"
 FRAGS = 0
 
