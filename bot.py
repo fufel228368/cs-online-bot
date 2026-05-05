@@ -519,7 +519,7 @@ def welcome_user(message: telebot.types.Message):
         if user.last_name:
             name += " " + user.last_name
         welcome_text = (
-            f"💙💛 Welcome HARKIV Front, <b>{name}</b>!\n\n"
+            f"💙💛 Welcome KHARKIV_STYLE 18+, <b>{name}</b>!\n\n"
             f"💙💛 Всі питання в розділах нашої групи ❤️💙💛"
         )
         bot.send_message(message.chat.id, welcome_text)
